@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
+import datetime
 from requests.auth import HTTPBasicAuth
 
 # --- 1. PAGE CONFIG ---
@@ -267,13 +268,16 @@ def render_custom_progress_bar(share_val, target_val):
     
     progress_label_html = ""
     
+    # Using round() to ensure exact whole numbers (e.g. 99.8% -> 100%)
+    rounded_prog = round(progress)
+    
     if progress > 100:
-        progress_label_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{int(progress)}%<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
+        progress_label_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{rounded_prog}%<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
     elif progress > 0:
         if progress < 15:
-            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(8px, -50%); color: #666; font-size: 14px; font-weight: 800; z-index: 20;">{int(progress)}%</div>'
+            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(8px, -50%); color: #666; font-size: 14px; font-weight: 800; z-index: 20;">{rounded_prog}%</div>'
         else:
-            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{int(progress)}%</div>'
+            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{rounded_prog}%</div>'
         
     html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track_color}; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{progress_label_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span><span style="position: absolute; right: -10px; font-size: 15px; font-weight: 800; color: #888;">100%</span></div></div>'
     return html
@@ -294,7 +298,6 @@ for idx, cat in enumerate(categories):
             user_done = len(cat_df[(cat_df['Assignee'].str.lower().str.strip() == TRACKED_USER.lower().strip()) & (cat_df['Is_Closed'])])
             share = (user_done / total_team * 100) if total_team > 0 else 0
             
-            # REMOVED SHARE: Now a clean 2-column layout for just Done and Total
             m1, m2 = st.columns(2)
             m1.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-green'>{user_done}</p><p class='custom-metric-label'>Done</p></div>", unsafe_allow_html=True)
             m2.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-orange'>{total_team}</p><p class='custom-metric-label'>Total</p></div>", unsafe_allow_html=True)
@@ -329,7 +332,7 @@ summary_df = pd.DataFrame(summary_list)
 summary_html = summary_df.to_html(index=False, classes="custom-audit-table", escape=False)
 st.markdown(f'<div class="static-table">{summary_html}</div>', unsafe_allow_html=True)
 
-# --- 7. AUDIT LOG WITH FILTERS ---
+# --- 7. AUDIT LOG WITH CALENDAR FILTER ---
 st.markdown("### Ticket Audit Log")
 
 audit_df = team_df[
@@ -341,19 +344,39 @@ audit_df = team_df[
 filter_col1, filter_col2, filter_col3 = st.columns(3)
 
 with filter_col1:
-    date_filter = st.multiselect("Filter by Created Date", sorted(audit_df['Created Date'].unique()))
+    if not audit_df.empty:
+        # Convert string dates back to actual datetime objects for the calendar widget
+        audit_df['DateObj'] = pd.to_datetime(audit_df['Created Date'], format='%d %b %Y').dt.date
+        min_date = audit_df['DateObj'].min()
+        max_date = audit_df['DateObj'].max()
+        
+        # Display the Calendar Input
+        date_range = st.date_input("Filter by Created Date (Range)", value=(min_date, max_date), min_value=min_date, max_value=max_date)
+    else:
+        date_range = []
+
 with filter_col2:
     type_filter = st.multiselect("Filter by TKTS-Type", sorted(audit_df['TKTS-Type'].unique()))
 with filter_col3:
     cat_filter = st.multiselect("Filter by Category", sorted(audit_df['Category'].unique()))
 
-# Apply filters if they are selected
-if date_filter:
-    audit_df = audit_df[audit_df['Created Date'].isin(date_filter)]
+# Apply Date Filter
+if len(date_range) == 2:
+    start_date, end_date = date_range
+    audit_df = audit_df[(audit_df['DateObj'] >= start_date) & (audit_df['DateObj'] <= end_date)]
+elif len(date_range) == 1:
+    start_date = date_range[0]
+    audit_df = audit_df[audit_df['DateObj'] == start_date]
+
+# Apply Type & Category Filters
 if type_filter:
     audit_df = audit_df[audit_df['TKTS-Type'].isin(type_filter)]
 if cat_filter:
     audit_df = audit_df[audit_df['Category'].isin(cat_filter)]
+
+# Clean up temporary DateObj column before displaying
+if 'DateObj' in audit_df.columns:
+    audit_df = audit_df.drop(columns=['DateObj'])
 
 if audit_df.empty:
     st.info("No tickets match the selected filters.")

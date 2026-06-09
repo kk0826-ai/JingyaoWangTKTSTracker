@@ -339,6 +339,7 @@ audit_df = team_df[
     (team_df['Category'] != "Other")
 ].drop(columns=['Is_Closed'])
 
+# Convert string dates to datetimes for the calendar logic right away
 if not audit_df.empty:
     audit_df['DateObj'] = pd.to_datetime(audit_df['Created Date'], format='%d %b %Y').dt.date
     min_date = audit_df['DateObj'].min()
@@ -350,25 +351,20 @@ else:
 filter_col1, filter_col2, filter_col3 = st.columns(3)
 
 with filter_col1:
+    # We split this column into "From" and "To" sub-columns
     date_col1, date_col2 = st.columns(2)
     with date_col1:
-        start_date = st.date_input("📅 From", value=None, min_value=min_date, max_value=max_date)
+        # value=None keeps it empty until the user picks a date
+        start_date = st.date_input("From", value=None, min_value=min_date, max_value=max_date)
     with date_col2:
-        end_date = st.date_input("📅 To", value=None, min_value=min_date, max_value=max_date)
+        end_date = st.date_input("To", value=None, min_value=min_date, max_value=max_date)
         
 with filter_col2:
-    st.write("**Filter by TKTS-Type**")
-    # Wrap checkboxes in a scrollable list box for a clean UI
-    with st.container(height=120, border=True):
-        type_filter = [opt for opt in sorted(audit_df['TKTS-Type'].unique()) if st.checkbox(opt, key=f"type_{opt}")]
-
+    type_filter = st.multiselect("Filter by TKTS-Type", sorted(audit_df['TKTS-Type'].unique()))
 with filter_col3:
-    st.write("**Filter by Category**")
-    # Wrap checkboxes in a scrollable list box for a clean UI
-    with st.container(height=120, border=True):
-        cat_filter = [opt for opt in sorted(audit_df['Category'].unique()) if st.checkbox(opt, key=f"cat_{opt}")]
+    cat_filter = st.multiselect("Filter by Category", sorted(audit_df['Category'].unique()))
 
-# Apply Date Filter
+# Apply Date Filter (Handles if they only pick a Start Date, only an End Date, or Both)
 if start_date and end_date:
     audit_df = audit_df[(audit_df['DateObj'] >= start_date) & (audit_df['DateObj'] <= end_date)]
 elif start_date:
@@ -376,7 +372,7 @@ elif start_date:
 elif end_date:
     audit_df = audit_df[audit_df['DateObj'] <= end_date]
 
-# Apply Checkbox Box Filters
+# Apply Type & Category Filters
 if type_filter:
     audit_df = audit_df[audit_df['TKTS-Type'].isin(type_filter)]
 if cat_filter:

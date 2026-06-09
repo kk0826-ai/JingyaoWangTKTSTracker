@@ -268,7 +268,6 @@ def render_custom_progress_bar(share_val, target_val):
     
     progress_label_html = ""
     
-    # Using round() to ensure exact whole numbers (e.g. 99.8% -> 100%)
     rounded_prog = round(progress)
     
     if progress > 100:
@@ -332,7 +331,7 @@ summary_df = pd.DataFrame(summary_list)
 summary_html = summary_df.to_html(index=False, classes="custom-audit-table", escape=False)
 st.markdown(f'<div class="static-table">{summary_html}</div>', unsafe_allow_html=True)
 
-# --- 7. AUDIT LOG WITH CALENDAR FILTER ---
+# --- 7. AUDIT LOG WITH DYNAMIC CALENDAR FILTERS ---
 st.markdown("### Ticket Audit Log")
 
 audit_df = team_df[
@@ -340,33 +339,38 @@ audit_df = team_df[
     (team_df['Category'] != "Other")
 ].drop(columns=['Is_Closed'])
 
+# Convert string dates to datetimes for the calendar logic right away
+if not audit_df.empty:
+    audit_df['DateObj'] = pd.to_datetime(audit_df['Created Date'], format='%d %b %Y').dt.date
+    min_date = audit_df['DateObj'].min()
+    max_date = audit_df['DateObj'].max()
+else:
+    min_date, max_date = None, None
+
 # Setup the filters UI
 filter_col1, filter_col2, filter_col3 = st.columns(3)
 
 with filter_col1:
-    if not audit_df.empty:
-        # Convert string dates back to actual datetime objects for the calendar widget
-        audit_df['DateObj'] = pd.to_datetime(audit_df['Created Date'], format='%d %b %Y').dt.date
-        min_date = audit_df['DateObj'].min()
-        max_date = audit_df['DateObj'].max()
+    # We split this column into "From" and "To" sub-columns
+    date_col1, date_col2 = st.columns(2)
+    with date_col1:
+        # value=None keeps it empty until the user picks a date
+        start_date = st.date_input("From", value=None, min_value=min_date, max_value=max_date)
+    with date_col2:
+        end_date = st.date_input("To", value=None, min_value=min_date, max_value=max_date)
         
-        # Display the Calendar Input
-        date_range = st.date_input("Filter by Created Date (Range)", value=(min_date, max_date), min_value=min_date, max_value=max_date)
-    else:
-        date_range = []
-
 with filter_col2:
     type_filter = st.multiselect("Filter by TKTS-Type", sorted(audit_df['TKTS-Type'].unique()))
 with filter_col3:
     cat_filter = st.multiselect("Filter by Category", sorted(audit_df['Category'].unique()))
 
-# Apply Date Filter
-if len(date_range) == 2:
-    start_date, end_date = date_range
+# Apply Date Filter (Handles if they only pick a Start Date, only an End Date, or Both)
+if start_date and end_date:
     audit_df = audit_df[(audit_df['DateObj'] >= start_date) & (audit_df['DateObj'] <= end_date)]
-elif len(date_range) == 1:
-    start_date = date_range[0]
-    audit_df = audit_df[audit_df['DateObj'] == start_date]
+elif start_date:
+    audit_df = audit_df[audit_df['DateObj'] >= start_date]
+elif end_date:
+    audit_df = audit_df[audit_df['DateObj'] <= end_date]
 
 # Apply Type & Category Filters
 if type_filter:
@@ -374,7 +378,7 @@ if type_filter:
 if cat_filter:
     audit_df = audit_df[audit_df['Category'].isin(cat_filter)]
 
-# Clean up temporary DateObj column before displaying
+# Clean up temporary DateObj column before displaying to the user
 if 'DateObj' in audit_df.columns:
     audit_df = audit_df.drop(columns=['DateObj'])
 

@@ -19,7 +19,7 @@ TARGET_PERCENTAGES = {
     "Celtra": 10.0
 }
 
-# The exact 6 team members
+# The exact 6 team members (Used for calculating the total pool)
 VALID_TEAM = [name.lower().strip() for name in [
     "Simin Zheng", 
     "Priyanka Shaw", 
@@ -272,21 +272,27 @@ if team_df.empty:
     st.warning("No tickets found for the specified team members.")
     st.stop()
 
-# --- 4. HELPER CHARTS ---
+# --- 4. HELPER CHARTS (UPDATED FOR PROGRESS VS. GOAL LOGIC) ---
 def build_progress_chart(share_val, target_val):
-    bar_color = '#00E676' if share_val >= target_val else '#58C0ED' 
-    chart_data = pd.DataFrame({'Share': [share_val], 'Goal': [target_val]})
+    # Calculate progress as a percentage of the goal (100 = Target hit)
+    progress_to_goal = (share_val / target_val * 100) if target_val > 0 else 0
+    
+    # Dynamically scale X-axis: Min 100, but if she exceeds, it expands to fit the bar
+    max_axis = max(100, progress_to_goal)
+    
+    bar_color = '#00E676' if progress_to_goal >= 100 else '#58C0ED' 
+    chart_data = pd.DataFrame({'Progress': [progress_to_goal], 'Goal': [100]})
     
     bar = alt.Chart(chart_data).mark_bar(size=24).encode(
-        x=alt.X('Share:Q', scale=alt.Scale(domain=[0, 100]), title=None, axis=alt.Axis(labels=False, ticks=False)),
+        x=alt.X('Progress:Q', scale=alt.Scale(domain=[0, max_axis]), title=None, axis=alt.Axis(labels=False, ticks=False)),
         color=alt.value(bar_color),
-        tooltip=['Share']
+        tooltip=[alt.Tooltip('Progress:Q', format='.1f', title='% of Target')]
     ).properties(height=40)
     
-    # FIXED: Reverted to a standard Goal:Q mapped rule and explicitly share the axes to lock it in place.
-    goal_line = alt.Chart(chart_data).mark_rule(color='#FF0000', strokeWidth=5, opacity=1).encode(
-        x='Goal:Q',
-        tooltip=['Goal']
+    # Red target line stays locked at 100%
+    goal_line = alt.Chart(chart_data).mark_rule(color='#FF0000', strokeWidth=4).encode(
+        x=alt.X('Goal:Q', scale=alt.Scale(domain=[0, max_axis])),
+        tooltip=[alt.Tooltip('Goal:Q', title='Target Achieved (100%)')]
     )
     
     return alt.layer(bar, goal_line).resolve_scale(x='shared').configure_view(strokeWidth=0)
@@ -308,6 +314,7 @@ for idx, cat in enumerate(categories):
             share = (user_done / total_team * 100) if total_team > 0 else 0
             
             m1, m2, m3 = st.columns(3)
+            # Text metrics still show exact "Share"
             m1.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-blue'>{share:.1f}%</p><p class='custom-metric-label'>Share</p></div>", unsafe_allow_html=True)
             m2.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-green'>{user_done}</p><p class='custom-metric-label'>Done</p></div>", unsafe_allow_html=True)
             m3.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-orange'>{total_team}</p><p class='custom-metric-label'>Total</p></div>", unsafe_allow_html=True)
@@ -315,6 +322,7 @@ for idx, cat in enumerate(categories):
             target_val = TARGET_PERCENTAGES.get(cat, 0)
             
             if total_team > 0:
+                # Progress bar visually represents "Progress to Goal"
                 st.altair_chart(build_progress_chart(share, target_val), use_container_width=True)
 
 st.divider()

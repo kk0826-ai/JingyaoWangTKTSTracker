@@ -128,6 +128,8 @@ button {
     z-index: 1;
     font-weight: 600;
 }
+
+/* Hyperlink Styling for Audit Table */
 .custom-audit-table a {
     color: #58C0ED;
     text-decoration: none;
@@ -255,47 +257,17 @@ if team_df.empty:
     st.warning("No tickets found for the specified team members.")
     st.stop()
 
-# --- 4. NEW CSS PROGRESS BAR LOGIC ---
+# --- 4. NEW CSS PROGRESS BAR LOGIC (Flattened to prevent Markdown bug) ---
 def render_custom_progress_bar(share_val, target_val):
-    # Calculate progress relative to 100% goal
     progress = (share_val / target_val * 100) if target_val > 0 else 0
-    
-    # Cap the visual fill at 100%, but keep track of actual progress for the red tag
     fill_width = min(100, progress)
-    
-    # Colors matching your mockup
     bar_color = "#8FFF00" if progress >= 100 else "#58C0ED" 
     
-    # Only generate the red "exceed" tag if progress > 100
     exceed_html = ""
     if progress > 100:
-        exceed_html = f"""
-        <div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); 
-                    background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; 
-                    padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">
-            {int(progress)}%
-            <div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); 
-                        width: 0; height: 0; border-top: 5px solid transparent; 
-                        border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div>
-        </div>
-        """
+        exceed_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{int(progress)}%<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
         
-    html = f"""
-    <div style="width: 100%; padding: 10px 10px 30px 10px; box-sizing: border-box; font-family: 'Manrope', sans-serif;">
-        <div style="position: relative; width: 100%; height: 28px; background-color: #1E2127; border-radius: 0px;">
-            <div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div>
-            
-            <div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>
-            
-            {exceed_html}
-        </div>
-        
-        <div style="position: relative; width: 100%; height: 20px; margin-top: 6px;">
-            <span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span>
-            <span style="position: absolute; right: 0; transform: translateX(50%); font-size: 17px; font-weight: 800; color: #FFF;">100</span>
-        </div>
-    </div>
-    """
+    html = f'<div style="width: 100%; padding: 10px 10px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: #1E2127; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{exceed_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span><span style="position: absolute; right: 0; transform: translateX(50%); font-size: 17px; font-weight: 800; color: #FFF;">100</span></div></div>'
     return html
 
 
@@ -322,7 +294,6 @@ for idx, cat in enumerate(categories):
             target_val = TARGET_PERCENTAGES.get(cat, 0)
             
             if total_team > 0:
-                # Injecting the custom HTML Progress Bar instead of Altair
                 st.markdown(render_custom_progress_bar(share, target_val), unsafe_allow_html=True)
 
 st.divider()

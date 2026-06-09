@@ -278,4 +278,112 @@ def render_custom_progress_bar(share_val, target_val):
         else:
             progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{rounded_prog}%</div>'
         
-    html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track
+    html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track_color}; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{progress_label_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span><span style="position: absolute; right: -10px; font-size: 15px; font-weight: 800; color: #888;">100%</span></div></div>'
+    return html
+
+
+# --- 5. DASHBOARD UI ---
+categories = ["Display", "Video", "Celtra"]
+cols = st.columns(3)
+
+for idx, cat in enumerate(categories):
+    with cols[idx]:
+        with st.container(border=True):
+            st.markdown(f"<h3 style='text-align:center; font-weight:600; margin-top:0;'>{cat}</h3>", unsafe_allow_html=True)
+            
+            cat_df = team_df[team_df['Category'] == cat]
+            total_team = len(cat_df)
+            
+            user_done = len(cat_df[(cat_df['Assignee'].str.lower().str.strip() == TRACKED_USER.lower().strip()) & (cat_df['Is_Closed'])])
+            share = (user_done / total_team * 100) if total_team > 0 else 0
+            
+            m1, m2 = st.columns(2)
+            m1.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-green'>{user_done}</p><p class='custom-metric-label'>Done</p></div>", unsafe_allow_html=True)
+            m2.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-orange'>{total_team}</p><p class='custom-metric-label'>Total</p></div>", unsafe_allow_html=True)
+            
+            target_val = TARGET_PERCENTAGES.get(cat, 0)
+            
+            if total_team > 0:
+                st.markdown(render_custom_progress_bar(share, target_val), unsafe_allow_html=True)
+
+st.divider()
+
+# --- 6. DATA TABLES ---
+st.markdown("### Summary")
+summary_list = []
+for cat in categories:
+    c_df = team_df[team_df['Category'] == cat]
+    t = len(c_df)
+    d = len(c_df[(c_df['Assignee'].str.lower().str.strip() == TRACKED_USER.lower().strip()) & (c_df['Is_Closed'])])
+    share_val = (d/t*100) if t > 0 else 0
+    target_val = TARGET_PERCENTAGES.get(cat, 0)
+    
+    summary_list.append({
+        "Category": cat,
+        "Total Team Tickets": t,
+        "Jingyao Completed": d,
+        "Current Share": f"{share_val:.1f}%",
+        "Target": f"{target_val}%",
+        "Status": "On Track" if share_val >= target_val else "Needs Attention"
+    })
+
+summary_df = pd.DataFrame(summary_list)
+summary_html = summary_df.to_html(index=False, classes="custom-audit-table", escape=False)
+st.markdown(f'<div class="static-table">{summary_html}</div>', unsafe_allow_html=True)
+
+# --- 7. AUDIT LOG WITH DYNAMIC CALENDAR FILTERS ---
+st.markdown("### Ticket Audit Log")
+
+audit_df = team_df[
+    (team_df['Assignee'].str.lower().str.strip() == TRACKED_USER.lower().strip()) & 
+    (team_df['Category'] != "Other")
+].drop(columns=['Is_Closed'])
+
+if not audit_df.empty:
+    audit_df['DateObj'] = pd.to_datetime(audit_df['Created Date'], format='%d %b %Y').dt.date
+    min_date = audit_df['DateObj'].min()
+    max_date = audit_df['DateObj'].max()
+else:
+    min_date, max_date = None, None
+
+# Setup the filters UI
+filter_col1, filter_col2, filter_col3 = st.columns(3)
+
+with filter_col1:
+    date_col1, date_col2 = st.columns(2)
+    with date_col1:
+        start_date = st.date_input("📅 From", value=None, min_value=min_date, max_value=max_date)
+    with date_col2:
+        end_date = st.date_input("📅 To", value=None, min_value=min_date, max_value=max_date)
+        
+with filter_col2:
+    # Restored classic multiselect dropdown for TKTS-Type
+    type_filter = st.multiselect("Filter by TKTS-Type", sorted(audit_df['TKTS-Type'].unique()))
+
+with filter_col3:
+    # Restored classic multiselect dropdown for Category
+    cat_filter = st.multiselect("Filter by Category", sorted(audit_df['Category'].unique()))
+
+# Apply Date Filter
+if start_date and end_date:
+    audit_df = audit_df[(audit_df['DateObj'] >= start_date) & (audit_df['DateObj'] <= end_date)]
+elif start_date:
+    audit_df = audit_df[audit_df['DateObj'] >= start_date]
+elif end_date:
+    audit_df = audit_df[audit_df['DateObj'] <= end_date]
+
+# Apply Multiselect Dropdown Filters
+if type_filter:
+    audit_df = audit_df[audit_df['TKTS-Type'].isin(type_filter)]
+if cat_filter:
+    audit_df = audit_df[audit_df['Category'].isin(cat_filter)]
+
+# Clean up temporary DateObj column before displaying to the user
+if 'DateObj' in audit_df.columns:
+    audit_df = audit_df.drop(columns=['DateObj'])
+
+if audit_df.empty:
+    st.info("No tickets match the selected filters.")
+else:
+    audit_html = audit_df.to_html(index=False, classes="custom-audit-table", escape=False)
+    st.markdown(f'<div class="scrollable-table">{audit_html}</div>', unsafe_allow_html=True)

@@ -257,7 +257,7 @@ if team_df.empty:
     st.warning("No tickets found for the specified team members.")
     st.stop()
 
-# --- 4. NEW SMART LABELED CSS PROGRESS BAR ---
+# --- 4. SMART LABELED CSS PROGRESS BAR ---
 def render_custom_progress_bar(share_val, target_val):
     progress = (share_val / target_val * 100) if target_val > 0 else 0
     fill_width = min(100, progress)
@@ -267,17 +267,12 @@ def render_custom_progress_bar(share_val, target_val):
     
     progress_label_html = ""
     
-    # 1. If exceeded, show the Red Flag
     if progress > 100:
         progress_label_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{int(progress)}%<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
-    
-    # 2. If > 0 but <= 100, show the text dynamically
     elif progress > 0:
         if progress < 15:
-            # If the bar is too small, place text outside the green fill so it isn't hidden
             progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(8px, -50%); color: #666; font-size: 14px; font-weight: 800; z-index: 20;">{int(progress)}%</div>'
         else:
-            # Place black text inside the green fill aligned to the right edge
             progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{int(progress)}%</div>'
         
     html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track_color}; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{progress_label_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span><span style="position: absolute; right: -10px; font-size: 15px; font-weight: 800; color: #888;">100%</span></div></div>'
@@ -299,10 +294,10 @@ for idx, cat in enumerate(categories):
             user_done = len(cat_df[(cat_df['Assignee'].str.lower().str.strip() == TRACKED_USER.lower().strip()) & (cat_df['Is_Closed'])])
             share = (user_done / total_team * 100) if total_team > 0 else 0
             
-            m1, m2, m3 = st.columns(3)
-            m1.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-blue'>{share:.1f}%</p><p class='custom-metric-label'>Share</p></div>", unsafe_allow_html=True)
-            m2.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-green'>{user_done}</p><p class='custom-metric-label'>Done</p></div>", unsafe_allow_html=True)
-            m3.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-orange'>{total_team}</p><p class='custom-metric-label'>Total</p></div>", unsafe_allow_html=True)
+            # REMOVED SHARE: Now a clean 2-column layout for just Done and Total
+            m1, m2 = st.columns(2)
+            m1.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-green'>{user_done}</p><p class='custom-metric-label'>Done</p></div>", unsafe_allow_html=True)
+            m2.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-orange'>{total_team}</p><p class='custom-metric-label'>Total</p></div>", unsafe_allow_html=True)
             
             target_val = TARGET_PERCENTAGES.get(cat, 0)
             

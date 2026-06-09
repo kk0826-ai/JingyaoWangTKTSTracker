@@ -2,32 +2,31 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-import altair as alt
 from requests.auth import HTTPBasicAuth
 
-# --- 1. PAGE CONFIG (Must be the absolute first Streamlit command) ---
+# --- 1. PAGE CONFIG ---
 TRACKED_USER = "Jingyao Wang"
 st.set_page_config(page_title=f"{TRACKED_USER} - TKTS Tracker", layout="wide")
 
 # --- CONFIGURATION ---
 OKR_GO_LIVE_DATE = "2026-04-01" 
 
-# Dynamic Targets for each category
+# Dynamic Targets for Jingyao
 TARGET_PERCENTAGES = {
     "Display": 14.0,
     "Video": 14.0,
     "Celtra": 10.0
 }
 
-# The exact 6 team members (Used for calculating the total pool)
-VALID_TEAM = [name.lower().strip() for name in [
-    "Simin Zheng", 
-    "Priyanka Shaw", 
-    "Tania Singh", 
-    "Roshni Subramanian", 
-    "Jingyao Wang", 
-    "Pushyami"
-]]
+# The exact 6 team members (Used for calculating the total team denominator)
+VALID_TEAM = [
+    "simin zheng", 
+    "priyanka shaw", 
+    "tania singh", 
+    "roshni subramanian", 
+    "jingyao wang", 
+    "pushyami"
+]
 
 # --- JIRA AUTH ---
 try:
@@ -44,12 +43,14 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap');
 
-html, body, [class*="st-"] { 
+/* Apply font safely without breaking Material Icons */
+html, body, p, div, h1, h2, h3, h4, h5, h6, span { 
     font-family: 'Manrope', Arial, sans-serif; 
-    font-weight: 300; 
 }
-h1, h2, h3, h4, h5, h6 { 
-    font-family: 'Manrope', Arial, sans-serif !important; 
+
+/* FIX: Ensure Streamlit icons (sort arrows, expanders) render correctly */
+i, .material-icons, .material-symbols-rounded, [class*="icon"] {
+    font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
 }
 
 /* Hero Banner */
@@ -127,8 +128,6 @@ button {
     z-index: 1;
     font-weight: 600;
 }
-
-/* Hyperlink Styling for Audit Table */
 .custom-audit-table a {
     color: #58C0ED;
     text-decoration: none;
@@ -144,19 +143,6 @@ button {
 .val-orange { color: #FFC300; }
 </style>
 """, unsafe_allow_html=True)
-
-# --- ALTAIR GLOBAL THEME ---
-def set_altair_theme():
-    font = "Manrope"
-    alt.themes.register("my_theme", lambda: {
-        "config": {
-            "font": font,
-            "title": {"font": font, "fontSize": 14, "fontWeight": 600},
-            "axis": {"labelFont": font, "titleFont": font, "grid": False},
-        }
-    })
-    alt.themes.enable("my_theme")
-set_altair_theme()
 
 # --- HEADER ---
 st.markdown(f"""
@@ -221,7 +207,6 @@ for issue in raw_issues:
     fields = issue.get('fields', {})
     ticket_key = issue.get('key')
     
-    # Format Creation Date
     created_raw = fields.get('created')
     created_date = pd.to_datetime(created_raw).strftime('%d %b %Y') if created_raw else "Unknown"
     
@@ -230,7 +215,6 @@ for issue in raw_issues:
     
     category = "Other"
     
-    # STRICT CATEGORY MATCHING
     if "display" in issue_type_lower: 
         category = "Display"
     elif any(keyword in issue_type_lower for keyword in ["video", "ctv", "ott"]): 
@@ -244,7 +228,6 @@ for issue in raw_issues:
     status_name = fields.get('status', {}).get('name', '').lower()
     is_closed = (status_name in DONE_STATUSES) or (fields.get('resolutiondate') is not None)
     
-    # HTML Link for the Ticket ID
     jira_link = f'<a href="{domain}/browse/{ticket_key}" target="_blank">{ticket_key}</a>'
     
     rows.append({
@@ -266,36 +249,54 @@ if df.empty:
 
 # --- FILTER BY TARGET POD/TEAM ---
 team_df = df[df['Assignee_Lower'].isin(VALID_TEAM)].copy()
-team_df.drop(columns=['Assignee_Lower'], inplace=True) # Cleanup
+team_df.drop(columns=['Assignee_Lower'], inplace=True) 
 
 if team_df.empty:
     st.warning("No tickets found for the specified team members.")
     st.stop()
 
-# --- 4. HELPER CHARTS (UPDATED FOR PROGRESS VS. GOAL LOGIC) ---
-def build_progress_chart(share_val, target_val):
-    # Calculate progress as a percentage of the goal (100 = Target hit)
-    progress_to_goal = (share_val / target_val * 100) if target_val > 0 else 0
+# --- 4. NEW CSS PROGRESS BAR LOGIC ---
+def render_custom_progress_bar(share_val, target_val):
+    # Calculate progress relative to 100% goal
+    progress = (share_val / target_val * 100) if target_val > 0 else 0
     
-    # Dynamically scale X-axis: Min 100, but if she exceeds, it expands to fit the bar
-    max_axis = max(100, progress_to_goal)
+    # Cap the visual fill at 100%, but keep track of actual progress for the red tag
+    fill_width = min(100, progress)
     
-    bar_color = '#00E676' if progress_to_goal >= 100 else '#58C0ED' 
-    chart_data = pd.DataFrame({'Progress': [progress_to_goal], 'Goal': [100]})
+    # Colors matching your mockup
+    bar_color = "#8FFF00" if progress >= 100 else "#58C0ED" 
     
-    bar = alt.Chart(chart_data).mark_bar(size=24).encode(
-        x=alt.X('Progress:Q', scale=alt.Scale(domain=[0, max_axis]), title=None, axis=alt.Axis(labels=False, ticks=False)),
-        color=alt.value(bar_color),
-        tooltip=[alt.Tooltip('Progress:Q', format='.1f', title='% of Target')]
-    ).properties(height=40)
-    
-    # Red target line stays locked at 100%
-    goal_line = alt.Chart(chart_data).mark_rule(color='#FF0000', strokeWidth=4).encode(
-        x=alt.X('Goal:Q', scale=alt.Scale(domain=[0, max_axis])),
-        tooltip=[alt.Tooltip('Goal:Q', title='Target Achieved (100%)')]
-    )
-    
-    return alt.layer(bar, goal_line).resolve_scale(x='shared').configure_view(strokeWidth=0)
+    # Only generate the red "exceed" tag if progress > 100
+    exceed_html = ""
+    if progress > 100:
+        exceed_html = f"""
+        <div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); 
+                    background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; 
+                    padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">
+            {int(progress)}%
+            <div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); 
+                        width: 0; height: 0; border-top: 5px solid transparent; 
+                        border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div>
+        </div>
+        """
+        
+    html = f"""
+    <div style="width: 100%; padding: 10px 10px 30px 10px; box-sizing: border-box; font-family: 'Manrope', sans-serif;">
+        <div style="position: relative; width: 100%; height: 28px; background-color: #1E2127; border-radius: 0px;">
+            <div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div>
+            
+            <div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>
+            
+            {exceed_html}
+        </div>
+        
+        <div style="position: relative; width: 100%; height: 20px; margin-top: 6px;">
+            <span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span>
+            <span style="position: absolute; right: 0; transform: translateX(50%); font-size: 17px; font-weight: 800; color: #FFF;">100</span>
+        </div>
+    </div>
+    """
+    return html
 
 
 # --- 5. DASHBOARD UI ---
@@ -314,7 +315,6 @@ for idx, cat in enumerate(categories):
             share = (user_done / total_team * 100) if total_team > 0 else 0
             
             m1, m2, m3 = st.columns(3)
-            # Text metrics still show exact "Share"
             m1.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-blue'>{share:.1f}%</p><p class='custom-metric-label'>Share</p></div>", unsafe_allow_html=True)
             m2.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-green'>{user_done}</p><p class='custom-metric-label'>Done</p></div>", unsafe_allow_html=True)
             m3.markdown(f"<div class='custom-metric-box'><p class='custom-metric-value val-orange'>{total_team}</p><p class='custom-metric-label'>Total</p></div>", unsafe_allow_html=True)
@@ -322,8 +322,8 @@ for idx, cat in enumerate(categories):
             target_val = TARGET_PERCENTAGES.get(cat, 0)
             
             if total_team > 0:
-                # Progress bar visually represents "Progress to Goal"
-                st.altair_chart(build_progress_chart(share, target_val), use_container_width=True)
+                # Injecting the custom HTML Progress Bar instead of Altair
+                st.markdown(render_custom_progress_bar(share, target_val), unsafe_allow_html=True)
 
 st.divider()
 

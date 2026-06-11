@@ -258,27 +258,30 @@ if team_df.empty:
     st.warning("No tickets found for the specified team members.")
     st.stop()
 
-# --- 4. SMART LABELED CSS PROGRESS BAR ---
+# --- 4. ACTUAL PERCENTAGE CSS PROGRESS BAR ---
 def render_custom_progress_bar(share_val, target_val):
-    progress = (share_val / target_val * 100) if target_val > 0 else 0
-    fill_width = min(100, progress)
+    # The physical visual fill still calculates progress towards the goal
+    progress_ratio = (share_val / target_val * 100) if target_val > 0 else 0
+    fill_width = min(100, progress_ratio)
     
     bar_color = "#00E676" 
     track_color = "#E2E8F0" 
     
+    # Format the explicit labels for the UI
+    display_share = f"{share_val:.1f}%"
+    display_target = f"{target_val:.1f}%" if target_val % 1 != 0 else f"{int(target_val)}%"
+    
     progress_label_html = ""
     
-    rounded_prog = round(progress)
-    
-    if progress > 100:
-        progress_label_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{rounded_prog}%<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
-    elif progress > 0:
-        if progress < 15:
-            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(8px, -50%); color: #666; font-size: 14px; font-weight: 800; z-index: 20;">{rounded_prog}%</div>'
+    if progress_ratio > 100:
+        progress_label_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{display_share}<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
+    elif progress_ratio > 0:
+        if progress_ratio < 20: # Slightly larger buffer for the decimal text
+            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(8px, -50%); color: #666; font-size: 14px; font-weight: 800; z-index: 20;">{display_share}</div>'
         else:
-            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{rounded_prog}%</div>'
+            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{display_share}</div>'
         
-    html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track_color}; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{progress_label_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span><span style="position: absolute; right: -10px; font-size: 15px; font-weight: 800; color: #888;">100%</span></div></div>'
+    html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track_color}; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{progress_label_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span><span style="position: absolute; right: -10px; font-size: 15px; font-weight: 800; color: #888;">{display_target}</span></div></div>'
     return html
 
 
@@ -357,11 +360,9 @@ with filter_col1:
         end_date = st.date_input("📅 To", value=None, min_value=min_date, max_value=max_date)
         
 with filter_col2:
-    # Restored classic multiselect dropdown for TKTS-Type
     type_filter = st.multiselect("Filter by TKTS-Type", sorted(audit_df['TKTS-Type'].unique()))
 
 with filter_col3:
-    # Restored classic multiselect dropdown for Category
     cat_filter = st.multiselect("Filter by Category", sorted(audit_df['Category'].unique()))
 
 # Apply Date Filter

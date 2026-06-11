@@ -7,7 +7,7 @@ from requests.auth import HTTPBasicAuth
 
 # --- 1. PAGE CONFIG ---
 TRACKED_USER = "Jingyao Wang"
-st.set_page_config(page_title=f"{TRACKED_USER} - Ticket Tracker", layout="wide")
+st.set_page_config(page_title=f"{TRACKED_USER} - TKTS Tracker", layout="wide")
 
 # --- CONFIGURATION ---
 OKR_GO_LIVE_DATE = "2026-04-01" 
@@ -260,32 +260,28 @@ if team_df.empty:
 
 # --- 4. ACTUAL PERCENTAGE CSS PROGRESS BAR ---
 def render_custom_progress_bar(share_val, target_val):
-    # The physical visual fill still calculates progress towards the goal so the bar knows where to draw itself
+    # The physical visual fill still calculates progress towards the goal
     progress_ratio = (share_val / target_val * 100) if target_val > 0 else 0
     fill_width = min(100, progress_ratio)
     
     bar_color = "#00E676" 
     track_color = "#E2E8F0" 
     
-    # NEW LOGIC: We output her TRUE share percentage directly to the UI labels
-    actual_share_int = int(round(share_val))
-    target_int = int(round(target_val))
+    # Format the explicit labels for the UI
+    display_share = f"{share_val:.1f}%"
+    display_target = f"{target_val:.1f}%" if target_val % 1 != 0 else f"{int(target_val)}%"
     
     progress_label_html = ""
     
     if progress_ratio > 100:
-        # Exceeds goal: Shows her exact share (e.g. 16%) in the red flag
-        progress_label_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{actual_share_int}%<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
+        progress_label_html = f'<div style="position: absolute; right: 0; top: 50%; transform: translate(-8px, -50%); background-color: #FF0000; color: #FFFFFF; font-size: 15px; font-weight: 800; padding: 3px 8px; border-radius: 3px; z-index: 20; display: flex; align-items: center;">{display_share}<div style="position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 5px solid #FF0000;"></div></div>'
     elif progress_ratio > 0:
-        if progress_ratio < 15:
-            # Under goal: Shows her exact share next to the tiny green bar
-            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(8px, -50%); color: #666; font-size: 14px; font-weight: 800; z-index: 20;">{actual_share_int}%</div>'
+        if progress_ratio < 20: # Slightly larger buffer for the decimal text
+            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(8px, -50%); color: #666; font-size: 14px; font-weight: 800; z-index: 20;">{display_share}</div>'
         else:
-            # Under goal: Shows her exact share inside the green bar
-            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{actual_share_int}%</div>'
+            progress_label_html = f'<div style="position: absolute; left: {fill_width}%; top: 50%; transform: translate(calc(-100% - 8px), -50%); color: #000; font-size: 14px; font-weight: 800; z-index: 20;">{display_share}</div>'
         
-    # The right end of the axis explicitly declares the TARGET (e.g. "14% Goal")
-    html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track_color}; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{progress_label_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0%</span><span style="position: absolute; right: -10px; font-size: 15px; font-weight: 800; color: #888;">{target_int}% Goal</span></div></div>'
+    html = f'<div style="width: 100%; padding: 10px 15px 30px 10px; box-sizing: border-box; font-family: \'Manrope\', sans-serif;"><div style="position: relative; width: 100%; height: 28px; background-color: {track_color}; border-radius: 0px;"><div style="position: absolute; top: 0; left: 0; height: 100%; width: {fill_width}%; background-color: {bar_color}; transition: width 0.5s;"></div><div style="position: absolute; right: 0; top: -6px; bottom: -6px; width: 3px; background-color: #FF0000; z-index: 10;"></div>{progress_label_html}</div><div style="position: relative; width: 100%; height: 20px; margin-top: 6px;"><span style="position: absolute; left: 0; font-size: 15px; color: #888; font-weight: 600;">0</span><span style="position: absolute; right: -10px; font-size: 15px; font-weight: 800; color: #888;">{display_target}</span></div></div>'
     return html
 
 
@@ -339,7 +335,7 @@ summary_html = summary_df.to_html(index=False, classes="custom-audit-table", esc
 st.markdown(f'<div class="static-table">{summary_html}</div>', unsafe_allow_html=True)
 
 # --- 7. AUDIT LOG WITH DYNAMIC CALENDAR FILTERS ---
-st.markdown("### Tickets Completed")
+st.markdown("### Ticket Audit Log")
 
 audit_df = team_df[
     (team_df['Assignee'].str.lower().str.strip() == TRACKED_USER.lower().strip()) & 

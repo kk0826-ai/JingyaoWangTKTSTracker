@@ -7,7 +7,7 @@ from requests.auth import HTTPBasicAuth
 
 # --- 1. PAGE CONFIG ---
 TRACKED_USER = "Jingyao Wang"
-st.set_page_config(page_title=f"{TRACKED_USER} - TKTS Tracker", layout="wide")
+st.set_page_config(page_title=f"{TRACKED_USER} - Ticket Tracker", layout="wide")
 
 # --- CONFIGURATION ---
 OKR_GO_LIVE_DATE = "2026-04-01" 
@@ -339,7 +339,7 @@ summary_html = summary_df.to_html(index=False, classes="custom-audit-table", esc
 st.markdown(f'<div class="static-table">{summary_html}</div>', unsafe_allow_html=True)
 
 # --- 7. AUDIT LOG WITH DYNAMIC CALENDAR FILTERS ---
-st.markdown("### Ticket Audit Log")
+st.markdown("### Tickets Completed")
 
 audit_df = team_df[
     (team_df['Assignee'].str.lower().str.strip() == TRACKED_USER.lower().strip()) & 
